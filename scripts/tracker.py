@@ -1,13 +1,15 @@
 #!/usr/bin/python3
 
 import rclpy
-import tf_transformations
 import math
 import numpy as np
-from geometry_msgs.msg import PoseStamped, Twist, TransformStamped, Pose, Quaternion
+import tf_transformations
+
+from geometry_msgs.msg import PoseStamped, Twist, TransformStamped, Pose, Quaternion, Point
 from nav_msgs.msg import Odometry, Path
 from rclpy.qos import qos_profile_system_default
 from rclpy.node import Node
+from visualization_msgs.msg import Marker
 
 from robot_simulation.pid import Pid
 
@@ -16,9 +18,9 @@ class node_maker(Node):
     plan_d = [PoseStamped()]
     twists = Twist()
 
-    pid_x = Pid(7.0, 0, 0.2)
-    pid_y = Pid(7.0, 0, 0.2)
-    pid_w = Pid(7.0, 0, 0.2)
+    pid_x = Pid(10.0, 0, 0.2)
+    pid_y = Pid(10.0, 0, 0.2)
+    pid_w = Pid(10.0, 0, 0.2)
 
     count = 0
     step_ = 100
@@ -36,6 +38,9 @@ class node_maker(Node):
         self.create_subscription(Path, '/plan', self.onPlan, qos_profile=qos_profile_system_default)
         self.plan__publisher = self.create_publisher(Path, '/plan', qos_profile=qos_profile_system_default)
         self.twist_publisher = self.create_publisher(Twist, '/cmd_vel', qos_profile=qos_profile_system_default)
+        self.mark__publisher = self.create_publisher(Marker, '/marker', qos_profile=qos_profile_system_default)
+
+        self.marker_setting()
 
         self.reference_matrix = self.transform_to_matrix(self.pose_to_transform(self.plan_d[self.count].pose))
 
@@ -128,18 +133,14 @@ class node_maker(Node):
                 ]
 
             x_err = np.array([log[2][1], log[0][2], log[1][0], log[0][3], log[1][3], log[2][3]])
-            # print(x_err)
+            self.get_logger().info(str(x_err))
 
             self.twists.angular.z = self.pid_w.pid(x_err[2])
-            if abs(x_err[2]) < 0.1:
-                self.twists.linear.x = self.pid_x.pid(x_err[3])
-                self.twists.linear.y = self.pid_y.pid(x_err[4])
-            else:
-                self.twists.linear.x = 0.0
-                self.twists.linear.y = 0.0
+            self.twists.linear.x = self.pid_x.pid(x_err[3])
+            self.twists.linear.y = self.pid_y.pid(x_err[4])
             self.twist_publisher.publish(self.twists)
 
-            if self.count < self.plan_d.__len__() and abs(x_err[3]) < 0.1 and abs(x_err[4]) < 0.1:
+            if self.count < self.plan_d.__len__() and abs(x_err[3]) < 0.015 and abs(x_err[4]) < 0.015 and abs(x_err[2]) < 0.015:
                 self.reference_matrix = self.transform_to_matrix(self.pose_to_transform(self.plan_d[self.count].pose))
                 self.count += 1
                 self.finish = False
@@ -155,28 +156,62 @@ class node_maker(Node):
             
 
     def onClick_points(self, msg: PoseStamped):
+        line_point = Point()
+        line_point.x = msg.pose.position.x
+        line_point.y = msg.pose.position.y
+        self.marker.points.append(line_point)
+        self.marker.color.a = 1.0
+        self.marker.color.r = 1.0
+        self.marker.color.g = 1.0
+        self.marker.color.b = 0.0
+        self.mark__publisher.publish(self.marker)
+
         data_send = Path()
         data_send.header.frame_id = 'odom'
-        for i in range(1, self.step_ + 1):
-            current_data_x = msg.pose.position.x - self.last_position[0]
-            current_data_y = msg.pose.position.y - self.last_position[1]
-            
-            angle = math.atan2(current_data_y - self.last_pos_angl[0], current_data_x - self.last_pos_angl[1])
-
-            tf_quate = tf_transformations.quaternion_from_euler(0, 0, angle)
-            rotation = Quaternion(x=tf_quate[0], y=tf_quate[1], z=tf_quate[2], w=tf_quate[3])
-
+        for i in range(self.step_):
             data = PoseStamped()
-            data.pose.position.x = (i * current_data_x / self.step_) + self.last_position[0]
-            data.pose.position.y = (i * current_data_y / self.step_) + self.last_position[1]
-            data.pose.orientation = rotation
-
+            if i < self.step_ -1:
+                data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
+                data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
+                angle = math.atan2((msg.pose.position.y - self.last_position[1]) - self.last_pos_angl[0], (msg.pose.position.x - self.last_position[0]) - self.last_pos_angl[1])
+                tf_quate = tf_transformations.quaternion_from_euler(0, 0, angle)
+                data.pose.orientation = Quaternion(x=tf_quate[0], y=tf_quate[1], z=tf_quate[2], w=tf_quate[3])
+            else:
+                data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
+                data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
+                data.pose.orientation = msg.pose.orientation
+            
             data_send.poses.append(data)
 
         self.plan__publisher.publish(data_send)
 
         self.last_position[0] = msg.pose.position.x
         self.last_position[1] = msg.pose.position.y
+    
+    def marker_setting(self):
+        self.marker = Marker()
+        self.marker.header.frame_id = "odom"
+        self.marker.type = self.marker.LINE_STRIP
+        self.marker.action = self.marker.ADD
+
+        self.marker.scale.x = 0.03
+        self.marker.scale.y = 0.03
+        self.marker.scale.z = 0.01
+
+        self.marker.color.a = 1.0
+        self.marker.color.r = 1.0
+        self.marker.color.g = 1.0
+        self.marker.color.b = 0.0
+
+        self.marker.pose.orientation.x = 0.0
+        self.marker.pose.orientation.y = 0.0
+        self.marker.pose.orientation.z = 0.0
+        self.marker.pose.orientation.w = 1.0
+        self.marker.points = []
+        line_point = Point()
+        line_point.x = 0.0
+        line_point.y = 0.0
+        self.marker.points.append(line_point)
 
 
 def main(args=None):
