@@ -33,6 +33,8 @@ class node_maker(Node):
         super().__init__('node_maker')
         self.get_logger().info('start node')
 
+        self.declare_parameter('orientation', value='fixed')
+
         self.create_subscription(PoseStamped, '/goal_pose', self.onClick_points, qos_profile=qos_profile_system_default)
         self.create_subscription(Odometry, '/odom', self.onOdom_data, qos_profile=qos_profile_system_default)
         self.create_subscription(Path, '/plan', self.onPlan, qos_profile=qos_profile_system_default)
@@ -170,16 +172,33 @@ class node_maker(Node):
         data_send.header.frame_id = 'odom'
         for i in range(self.step_):
             data = PoseStamped()
-            if i < self.step_ -1:
+            if self.get_parameter('orientation').value == 'fixed':
+                data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
+                data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
+
+            elif self.get_parameter('orientation').value == 'follow_line':
                 data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
                 data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
                 angle = math.atan2((msg.pose.position.y - self.last_position[1]) - self.last_pos_angl[0], (msg.pose.position.x - self.last_position[0]) - self.last_pos_angl[1])
                 tf_quate = tf_transformations.quaternion_from_euler(0, 0, angle)
                 data.pose.orientation = Quaternion(x=tf_quate[0], y=tf_quate[1], z=tf_quate[2], w=tf_quate[3])
-            else:
+
+            elif self.get_parameter('orientation').value == 'setpoint':
                 data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
                 data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
                 data.pose.orientation = msg.pose.orientation
+
+            elif self.get_parameter('orientation').value == 'follow_line_&_setpoint':
+                if i < self.step_ -1:
+                    data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
+                    data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
+                    angle = math.atan2((msg.pose.position.y - self.last_position[1]) - self.last_pos_angl[0], (msg.pose.position.x - self.last_position[0]) - self.last_pos_angl[1])
+                    tf_quate = tf_transformations.quaternion_from_euler(0, 0, angle)
+                    data.pose.orientation = Quaternion(x=tf_quate[0], y=tf_quate[1], z=tf_quate[2], w=tf_quate[3])
+                else:
+                    data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
+                    data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
+                    data.pose.orientation = msg.pose.orientation
             
             data_send.poses.append(data)
 
