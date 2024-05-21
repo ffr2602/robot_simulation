@@ -3,6 +3,7 @@
 import rclpy
 import math
 import numpy as np
+import rclpy.parameter
 import tf_transformations
 
 from geometry_msgs.msg import PoseStamped, Twist, TransformStamped, Pose, Quaternion, Point
@@ -30,7 +31,7 @@ class node_maker(Node):
     finish = False
 
     def __init__(self):
-        super().__init__('node_maker')
+        super().__init__('path_tracking')
         self.get_logger().info('start node')
 
         self.declare_parameter('orientation', value='fixed')

@@ -1,0 +1,9 @@
+path_tracking:
+  ros__parameters:
+    orientation: follow_line_&_setpoint
+
+  # orientation mode:
+  # fixed
+  # follow_line
+  # setpoint
+  # follow_line_&_setpoint

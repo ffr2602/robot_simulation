@@ -55,10 +55,12 @@ def generate_launch_description():
         remappings=[('/cmd_vel_out', '/omni_cont/cmd_vel_unstamped')]
     )
 
+    control_params = os.path.join(get_package_share_directory(package_name), 'config', 'control_params.yaml')
     node_tracking = Node(
         package=package_name,
-        executable='tracker.py',
-        name='trajectory_tracking'
+        executable='path_tracking.py',
+        name='path_tracking',
+        parameters=[control_params]
     )
 
     rviz_bot = IncludeLaunchDescription(
