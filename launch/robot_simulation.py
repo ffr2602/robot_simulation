@@ -49,7 +49,7 @@ def generate_launch_description():
 
     node_tracking = Node(
         package=package_name,
-        executable='trajectory_tracking',
+        executable='tracker.py',
         name='trajectory_tracking'
     )
 
