@@ -57,7 +57,6 @@ install(
 install(PROGRAMS
   scripts/joy_control.py
   scripts/omni_controller.py
-  scripts/node_maker.py
   scripts/tracker.py
   DESTINATION lib/${PROJECT_NAME}
 )

@@ -47,6 +47,14 @@ def generate_launch_description():
         name='robot_controller'
     )
 
+    twist_mux_params = os.path.join(get_package_share_directory(package_name), 'config', 'twist_mux.yaml')
+    twist_mux = Node(
+        package="twist_mux",
+        executable="twist_mux",
+        parameters=[twist_mux_params],
+        remappings=[('/cmd_vel_out', '/omni_cont/cmd_vel_unstamped')]
+    )
+
     node_tracking = Node(
         package=package_name,
         executable='tracker.py',
@@ -66,7 +74,8 @@ def generate_launch_description():
         node_controller,
         rviz_bot,
         rosbridge,
-        # node_tracking
+        twist_mux,
+        node_tracking
         # gazebo,
         # spawn_entity
     ])

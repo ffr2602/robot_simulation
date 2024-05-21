@@ -23,11 +23,6 @@ class node_maker(Node):
     count = 0
     step_ = 100
     
-    kp = 2.0
-    ki = 1.0
-
-    limit = 0.7
-    int_x_err = 0.0
     last_pos_angl = np.zeros(2)
     last_position = np.zeros(2)
     finish = False
@@ -133,7 +128,7 @@ class node_maker(Node):
                 ]
 
             x_err = np.array([log[2][1], log[0][2], log[1][0], log[0][3], log[1][3], log[2][3]])
-            print(x_err)
+            # print(x_err)
 
             self.twists.angular.z = self.pid_w.pid(x_err[2])
             if abs(x_err[2]) < 0.1:

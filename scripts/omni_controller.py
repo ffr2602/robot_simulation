@@ -38,7 +38,7 @@ class controller(Node):
         self.WHEEL_RADIUS = wheel_radius
 
         self.create_subscription(Imu, '/imu', self.imu_feedback, qos_profile=qos_profile_sensor_data)
-        self.create_subscription(Twist, '/cmd_vel', self.apply_velocity, qos_profile=qos_profile_system_default)
+        self.create_subscription(Twist, '/omni_cont/cmd_vel_unstamped', self.apply_velocity, qos_profile=qos_profile_system_default)
         self.joints_publisher = self.create_publisher(JointState, '/joint_states', 10)
         self.odom_publisher = self.create_publisher(Odometry, '/odom', 10)
         self.odom_broadcaster = TransformBroadcaster(self, qos_profile_system_default)
