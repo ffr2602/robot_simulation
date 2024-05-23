@@ -18,10 +18,11 @@ class Pid:
         self.last_err = error
         self.i_err = self.i_err + error
         result_pid = (self.kp * error) + (self.ki * self.i_err) + (self.kd * self.d_err)
-        if result_pid >= 0:
-            return self.limit if result_pid > self.limit else result_pid
-        else:
-            return -self.limit if result_pid < -self.limit else result_pid
+        return result_pid
+        # if result_pid >= 0:
+        #     return self.limit if result_pid > self.limit else result_pid
+        # else:
+        #     return -self.limit if result_pid < -self.limit else result_pid
 
     def reset_err(self):
         self.i_err = 0

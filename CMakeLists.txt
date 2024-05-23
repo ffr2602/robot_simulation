@@ -22,7 +22,18 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
+find_package(Armadillo REQUIRED)
+
 link_directories(${gazebo_dev_LIBRARY_DIRS})
+include_directories(${ARMADILLO_INCLUDE_DIRS})
+
+add_executable(trajectory_tracking scripts/path_tracking.cpp)
+ament_target_dependencies(trajectory_tracking rclcpp geometry_msgs sensor_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs)
+target_link_libraries(trajectory_tracking ${ARMADILLO_LIBRARIES})
+
+install(TARGETS
+  trajectory_tracking
+  DESTINATION lib/${PROJECT_NAME})
 
 add_library(gazebo_ros_omni_drive SHARED
   scripts/gazebo_ros_omni_drive/gazebo_ros_omni_drive.cpp

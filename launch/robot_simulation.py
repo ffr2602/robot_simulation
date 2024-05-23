@@ -58,7 +58,7 @@ def generate_launch_description():
     control_params = os.path.join(get_package_share_directory(package_name), 'config', 'control_params.yaml')
     node_tracking = Node(
         package=package_name,
-        executable='path_tracking.py',
+        executable='trajectory_tracking',
         name='path_tracking',
         parameters=[control_params]
     )
