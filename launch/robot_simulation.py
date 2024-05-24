@@ -58,7 +58,7 @@ def generate_launch_description():
     control_params = os.path.join(get_package_share_directory(package_name), 'config', 'control_params.yaml')
     node_tracking = Node(
         package=package_name,
-        executable='trajectory_tracking',
+        executable='path_tracking.py',
         name='path_tracking',
         parameters=[control_params]
     )
@@ -77,7 +77,7 @@ def generate_launch_description():
         rviz_bot,
         rosbridge,
         twist_mux,
-        node_tracking
+        # node_tracking
         # gazebo,
         # spawn_entity
     ])
