@@ -1,9 +1,25 @@
 path_tracking:
   ros__parameters:
-    orientation: follow_line_&_setpoint
+    orientation: follow_line
+    step: 500
+
+    pid_x-Kp: 20.0
+    pid_x-Ki: 0.0
+    pid_x-Kd: 0.2
+
+    pid_y-Kp: 20.0
+    pid_y-Ki: 0.0
+    pid_y-Kd: 0.2
+
+    pid_w-Kp: 20.0
+    pid_w-Ki: 0.0
+    pid_w-Kd: 0.2
+
+    limit_speed_on_x: 1.0
+    limit_speed_on_y: 1.0
+    limit_speed_on_w: 1.0
 
   # orientation mode:
   # fixed
   # follow_line
   # setpoint
-  # follow_line_&_setpoint

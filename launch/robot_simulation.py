@@ -77,7 +77,7 @@ def generate_launch_description():
         rviz_bot,
         rosbridge,
         twist_mux,
-        # node_tracking
+        node_tracking
         # gazebo,
         # spawn_entity
     ])

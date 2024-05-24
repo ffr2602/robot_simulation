@@ -22,9 +22,9 @@ class node_maker(Node):
     twists = Twist()
 
     count = 0
-    step_ = 500
 
     last_position = np.zeros(2)
+    toleransi = 0.005
 
     finish = True
     plan_n = False
@@ -34,12 +34,23 @@ class node_maker(Node):
         self.get_logger().info('start node')
 
         self.declare_parameter('orientation', value='follow_line')
-        self.declare_parameter('Kp', value=5.0)
-        self.declare_parameter('Ki', value=0.0)
-        self.declare_parameter('Kd', value=0.2)
-        self.declare_parameter('limit_speed_on_x', value=0.3)
-        self.declare_parameter('limit_speed_on_y', value=0.3)
-        self.declare_parameter('limit_speed_on_w', value=0.3)
+        self.declare_parameter('step', value=500)
+
+        self.declare_parameter('pid_x-Kp', value=20.0)
+        self.declare_parameter('pid_x-Ki', value=0.0)
+        self.declare_parameter('pid_x-Kd', value=0.2)
+
+        self.declare_parameter('pid_y-Kp', value=20.0)
+        self.declare_parameter('pid_y-Ki', value=0.0)
+        self.declare_parameter('pid_y-Kd', value=0.2)
+
+        self.declare_parameter('pid_w-Kp', value=20.0)
+        self.declare_parameter('pid_w-Ki', value=0.0)
+        self.declare_parameter('pid_w-Kd', value=0.2)
+
+        self.declare_parameter('limit_speed_on_x', value=2.0)
+        self.declare_parameter('limit_speed_on_y', value=2.0)
+        self.declare_parameter('limit_speed_on_w', value=1.0)
 
         self.create_subscription(PoseStamped, '/goal_pose', self.onClick_points, qos_profile=qos_profile_system_default)
         self.create_subscription(Odometry, '/odom', self.onOdom_data, qos_profile=qos_profile_system_default)
@@ -52,6 +63,11 @@ class node_maker(Node):
         self.marker_setting()
 
         self.reference_config = self.transform_to_matrix(self.pose_to_transform(self.plan_d[self.count].pose))
+
+        self.step_ = self.get_parameter('step').value
+        self.pid_x = PID(self.get_parameter('pid_x-Kp').value, self.get_parameter('pid_x-Ki').value, self.get_parameter('pid_x-Kd').value)
+        self.pid_y = PID(self.get_parameter('pid_y-Kp').value, self.get_parameter('pid_y-Ki').value, self.get_parameter('pid_y-Kd').value)
+        self.pid_w = PID(self.get_parameter('pid_w-Kp').value, self.get_parameter('pid_w-Ki').value, self.get_parameter('pid_w-Kd').value)
 
     def onPlan(self, msg: Path):
         self.plan_d += msg.poses
@@ -154,29 +170,32 @@ class node_maker(Node):
                 ]
 
             x_err = np.array([log[2][1], log[0][2], log[1][0], log[0][3], log[1][3], log[2][3]])
-            self.get_logger().info(str(round(x_err[2], 2)) + " " + str(round(x_err[3], 2)) + " " + str(round(x_err[4], 2)) + " " + str(self.count) + " " + str(self.plan_d.__len__()))
+            self.get_logger().info(str(round(x_err[2], 4)) + " " + str(round(x_err[3], 4)) + " " + str(round(x_err[4], 4)) + " " + str(self.count) + " " + str(self.plan_d.__len__()))
 
-            self.twists.angular.z = PID(self.get_parameter('Kp').value, self.get_parameter('Ki').value, self.get_parameter('Kd').value).compute(x_err[2], self.get_parameter('limit_speed_on_w').value)
-            self.twists.linear.x  = PID(self.get_parameter('Kp').value, self.get_parameter('Ki').value, self.get_parameter('Kd').value).compute(x_err[3], self.get_parameter('limit_speed_on_x').value)
-            self.twists.linear.y  = PID(self.get_parameter('Kp').value, self.get_parameter('Ki').value, self.get_parameter('Kd').value).compute(x_err[4], self.get_parameter('limit_speed_on_y').value)
+            self.twists.angular.z = self.pid_w.compute(x_err[2], self.get_parameter('limit_speed_on_w').value)
+            self.twists.linear.x  = self.pid_x.compute(x_err[3], self.get_parameter('limit_speed_on_x').value)
+            self.twists.linear.y  = self.pid_y.compute(x_err[4], self.get_parameter('limit_speed_on_y').value)
 
-            if abs(x_err[3]) < 0.2 and abs(x_err[4]) < 0.2 and abs(x_err[2]) < 0.015:
+            if abs(x_err[3]) < 0.2 and abs(x_err[4]) < 0.2 and abs(x_err[2]) < self.toleransi:
                 if self.count < self.plan_d.__len__():
                     for i in range(int((self.plan_d.__len__() - 1) / self.step_)):
-                        if self.count == (i * self.step_):
+                        if self.count == (i * self.step_) + 1:
                             self.plan_n = True
                             break
                         else:
                             self.plan_n = False
+
                     if self.plan_n == True:
-                        if abs(x_err[3]) < 0.015 and abs(x_err[4]) < 0.015 and abs(x_err[2]) < 0.015:
+                        if abs(x_err[3]) < self.toleransi and abs(x_err[4]) < self.toleransi and abs(x_err[2]) < self.toleransi:
                             self.reference_config = self.transform_to_matrix(self.pose_to_transform(self.plan_d[self.count].pose))
+                            self.odom_ref(self.plan_d[self.count].pose)
                             self.count += 1
                     else:
                         self.reference_config = self.transform_to_matrix(self.pose_to_transform(self.plan_d[self.count].pose))
+                        self.odom_ref(self.plan_d[self.count].pose)
                         self.count += 1
 
-                elif self.count == self.plan_d.__len__() and abs(x_err[3]) < 0.01 and abs(x_err[4]) < 0.01 and abs(x_err[2]) < 0.01:
+                elif self.count == self.plan_d.__len__() and abs(x_err[3]) < self.toleransi and abs(x_err[4]) < self.toleransi and abs(x_err[2]) < self.toleransi:
                     self.finish = True
                     self.twists.angular.z = 0.0
                     self.twists.linear.x = 0.0
@@ -215,18 +234,6 @@ class node_maker(Node):
                 data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
                 data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
                 data.pose.orientation = msg.pose.orientation
-
-            elif self.get_parameter('orientation').value == 'follow_line_&_setpoint':
-                if i < self.step_ - 1:
-                    data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
-                    data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
-                    angle = math.atan2((msg.pose.position.y - self.last_position[1]), (msg.pose.position.x - self.last_position[0]))
-                    tf_quate = tf_transformations.quaternion_from_euler(0, 0, angle)
-                    data.pose.orientation = Quaternion(x=tf_quate[0], y=tf_quate[1], z=tf_quate[2], w=tf_quate[3])
-                else:
-                    data.pose.position.x = (i * (msg.pose.position.x - self.last_position[0]) / self.step_) + self.last_position[0]
-                    data.pose.position.y = (i * (msg.pose.position.y - self.last_position[1]) / self.step_) + self.last_position[1]
-                    data.pose.orientation = msg.pose.orientation
 
             data_send.poses.append(data)
 

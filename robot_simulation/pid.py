@@ -3,7 +3,6 @@ class PID:
     i_err = 0
     d_err = 0
     last_err = 0
-    windup = 0.2
 
     def __init__(self, kp=0, ki=0, kd=0) -> None:
         self.kp = kp
@@ -11,11 +10,9 @@ class PID:
         self.kd = kd
 
     def compute(self, error, limit) -> float:
-        if self.i_err > self.windup:
-            self.i_err = 0
         self.d_err = error - self.last_err
+        self.i_err += error
         self.last_err = error
-        self.i_err = self.i_err + error
         result_pid = (self.kp * error) + (self.ki * self.i_err) + (self.kd * self.d_err)
         if result_pid >= 0:
             return limit if result_pid > limit else result_pid
