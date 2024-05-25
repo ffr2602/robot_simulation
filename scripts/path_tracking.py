@@ -6,8 +6,8 @@ import numpy as np
 import rclpy.parameter
 import tf_transformations
 
-
 from geometry_msgs.msg import PoseStamped, Twist, TransformStamped, Pose, Quaternion, Point
+from std_msgs.msg import String
 from nav_msgs.msg import Odometry, Path
 from rclpy.qos import qos_profile_system_default
 from rclpy.node import Node
@@ -59,6 +59,7 @@ class node_maker(Node):
         self.twist_publisher = self.create_publisher(Twist, '/cmd_vel', qos_profile=qos_profile_system_default)
         self.mark__publisher = self.create_publisher(Marker, '/marker', qos_profile=qos_profile_system_default)
         self.odref_publisher = self.create_publisher(Odometry, '/odom_ref', qos_profile=qos_profile_system_default)
+        self.cnftn_publisher = self.create_publisher(String, '/robot_kondisi', qos_profile=qos_profile_system_default)
 
         self.marker_setting()
 
@@ -72,6 +73,11 @@ class node_maker(Node):
     def onPlan(self, msg: Path):
         self.plan_d += msg.poses
         self.finish = False
+    
+    def onKondisi(self, data_kondisi):
+        data_send = String()
+        data_send.data = data_kondisi
+        self.cnftn_publisher.publish(data_send)
 
     def pose_to_transform(self, msg: Pose):
         transform = TransformStamped()
@@ -111,6 +117,8 @@ class node_maker(Node):
     def onOdom_data(self, msg: Odometry):
 
         if self.finish is not True:
+
+            self.onKondisi('Bergerak')
 
             log = np.matrix([])
             log3 = np.matrix([])
@@ -200,6 +208,7 @@ class node_maker(Node):
                     self.twists.angular.z = 0.0
                     self.twists.linear.x = 0.0
                     self.twists.linear.y = 0.0
+                    self.onKondisi('Diam')
 
             self.twist_publisher.publish(self.twists)
 
