@@ -19,13 +19,11 @@ from robot_simulation.pid import PID
 class node_maker(Node):
 
     plan_d = [PoseStamped()]
-    twists = Twist()
 
     count = 0
 
     last_position = np.zeros(2)
-    position_act_ = np.zeros(3)
-    toleransi = 0.001
+    toleransi = 0.01
 
     finish = True
     plan_n = False
@@ -35,7 +33,7 @@ class node_maker(Node):
         self.get_logger().info('start node')
 
         self.declare_parameter('orientation', value='follow_line')
-        self.declare_parameter('step', value=500)
+        self.declare_parameter('step', value=50)
 
         self.declare_parameter('pid_x-Kp', value=20.0)
         self.declare_parameter('pid_x-Ki', value=0.0)
@@ -53,7 +51,6 @@ class node_maker(Node):
         self.declare_parameter('limit_speed_on_y', value=2.0)
         self.declare_parameter('limit_speed_on_w', value=1.0)
 
-        self.create_timer(0.5, self.timer_callback)
         self.create_subscription(PoseStamped, '/goal_pose', self.onClick_points, qos_profile=qos_profile_system_default)
         self.create_subscription(Odometry, '/odom', self.onOdom_data, qos_profile=qos_profile_system_default)
         self.create_subscription(Path, '/plan', self.onPlan, qos_profile=qos_profile_system_default)
@@ -71,21 +68,10 @@ class node_maker(Node):
         self.pid_x = PID(self.get_parameter('pid_x-Kp').value, self.get_parameter('pid_x-Ki').value, self.get_parameter('pid_x-Kd').value)
         self.pid_y = PID(self.get_parameter('pid_y-Kp').value, self.get_parameter('pid_y-Ki').value, self.get_parameter('pid_y-Kd').value)
         self.pid_w = PID(self.get_parameter('pid_w-Kp').value, self.get_parameter('pid_w-Ki').value, self.get_parameter('pid_w-Kd').value)
-    
-    def timer_callback(self):
-        data_log = '{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:}\t{:}\n'.format(self.position_act_[0], self.plan_d[self.count - 1].pose.position.x, self.position_act_[1], self.plan_d[self.count - 1].pose.position.y, self.count, self.plan_d.__len__())
-        self.get_logger().info(data_log)
-        if self.finish == False:
-            self.log_data(data_log)
 
     def onPlan(self, msg: Path):
         self.plan_d += msg.poses
         self.finish = False
-    
-    def log_data(self, data):
-        file = open('data.txt', 'a')
-        file.write(data)
-        file.close
     
     def onKondisi(self, data_kondisi):
         data_send = String()
@@ -129,16 +115,9 @@ class node_maker(Node):
 
     def onOdom_data(self, msg: Odometry):
 
-        self.position_act_[0] = msg.pose.pose.position.x
-        self.position_act_[1] = msg.pose.pose.position.y
-        self.position_act_[2] = msg.pose.pose.orientation.w
-
         if self.finish is not True:
 
-            self.onKondisi('Bergerak')
-
-            log = np.matrix([])
-            log3 = np.matrix([])
+            self.onKondisi('OnTrack')
 
             current___config = self.transform_to_matrix(self.pose_to_transform(msg.pose.pose))
             
@@ -195,10 +174,14 @@ class node_maker(Node):
                 ]
 
             x_err = np.array([log[2][1], log[0][2], log[1][0], log[0][3], log[1][3], log[2][3]])
-           
-            self.twists.angular.z = self.pid_w.compute(x_err[2], self.get_parameter('limit_speed_on_w').value)
-            self.twists.linear.x  = self.pid_x.compute(x_err[3], self.get_parameter('limit_speed_on_x').value)
-            self.twists.linear.y  = self.pid_y.compute(x_err[4], self.get_parameter('limit_speed_on_y').value)
+
+            data_log = '{:.2f}\t{:.2f}\t{:.2f}'.format(x_err[3], x_err[4], x_err[2])
+            self.get_logger().info(data_log)
+
+            twists = Twist()
+            twists.angular.z = self.pid_w.compute(x_err[2], self.get_parameter('limit_speed_on_w').value)
+            twists.linear.x  = self.pid_x.compute(x_err[3], self.get_parameter('limit_speed_on_x').value)
+            twists.linear.y  = self.pid_y.compute(x_err[4], self.get_parameter('limit_speed_on_y').value)
 
             if abs(x_err[3]) < 0.1 and abs(x_err[4]) < 0.1 and abs(x_err[2]) < self.toleransi:
                 if self.count < self.plan_d.__len__():
@@ -221,12 +204,13 @@ class node_maker(Node):
 
                 elif self.count == self.plan_d.__len__() and abs(x_err[3]) < self.toleransi and abs(x_err[4]) < self.toleransi and abs(x_err[2]) < self.toleransi:
                     self.finish = True
-                    self.twists.angular.z = 0.0
-                    self.twists.linear.x = 0.0
-                    self.twists.linear.y = 0.0
-                    self.onKondisi('Diam')
+                    twists = Twist()
+                    twists.angular.z = 0.0
+                    twists.linear.x = 0.0
+                    twists.linear.y = 0.0
+                    self.onKondisi('Stop')
 
-            self.twist_publisher.publish(self.twists)
+            self.twist_publisher.publish(twists)
 
     def onClick_points(self, msg: PoseStamped):
         self.finish = False
