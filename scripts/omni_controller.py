@@ -9,6 +9,7 @@ import numpy as np
 
 from sensor_msgs.msg import JointState, Imu
 from geometry_msgs.msg import Twist, TransformStamped, Quaternion
+from std_msgs.msg import String
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_system_default
@@ -39,6 +40,7 @@ class controller(Node):
 
         self.create_subscription(Imu, '/imu', self.imu_feedback, qos_profile=qos_profile_sensor_data)
         self.create_subscription(Twist, '/omni_cont/cmd_vel_unstamped', self.apply_velocity, qos_profile=qos_profile_system_default)
+        self.create_subscription(String, '/rset', self.onReset, qos_profile=qos_profile_system_default)
         self.joints_publisher = self.create_publisher(JointState, '/joint_states', 10)
         self.odom_publisher = self.create_publisher(Odometry, '/odom', 10)
         self.odom_broadcaster = TransformBroadcaster(self, qos_profile_system_default)
@@ -53,6 +55,13 @@ class controller(Node):
         self.robot = robot(self.GEOMETRI_ROBOT, self.WHEEL_RADIUS)
 
         threading.Thread(target=self.read_thread_function).start()
+    
+    def onReset(self, msg: String):
+        if msg.data == 'reset':
+            self.motor_vel      = np.zeros(4).astype(int)
+            self.rotation       = Quaternion()
+            self.motor_position = np.zeros(4)
+            self.position       = np.zeros(3).astype(float)
 
     def imu_feedback(self, msg: Imu):
         self.rotation = msg.orientation
